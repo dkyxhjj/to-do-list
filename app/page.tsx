@@ -45,7 +45,7 @@ export default function Home() {
     <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${
       theme === 'dark' 
         ? 'bg-gray-900 text-gray-100' 
-        : 'bg-gradient-to-br from-blue-100 to-purple-100 text-gray-800'
+        : 'bg-gradient-to-br from-cyan-100 to-blue-200 text-gray-800'
     }`}>
       <motion.div 
         initial={{ opacity: 0, scale: 0.9 }}
@@ -81,7 +81,7 @@ export default function Home() {
             value={inputTask}
             onChange={(e) => setInputTask(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && addTask()} 
-            placeholder="What needs to be done?"
+            placeholder="What is due soon!???"
             className={`flex-grow p-3 rounded-l-lg border-2 transition-colors ${
               theme === 'dark' 
                 ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500' 
