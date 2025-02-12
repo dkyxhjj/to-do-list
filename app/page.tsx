@@ -6,12 +6,14 @@ import { motion, AnimatePresence } from 'framer-motion'
 interface Task {
   id: number;     
   text: string;   
-  completed: boolean; 
+  completed: boolean;
+  priority: 1 | 2 | 3;
 }
 
 export default function Home() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [inputTask, setInputTask] = useState('')
+  const [inputPriority, setInputPriority] = useState<1 | 2 | 3>(1)
   const [theme, setTheme] = useState<'light' | 'dark'>('light')
 
   const addTask = () => {
@@ -20,10 +22,12 @@ export default function Home() {
     const newTask: Task = {
       id: Date.now(),
       text: inputTask,
-      completed: false
+      completed: false,
+      priority: inputPriority
     }
 
-    setTasks([...tasks, newTask])
+    const updatedTasks = [...tasks, newTask].sort((a, b) => b.priority - a.priority)
+    setTasks(updatedTasks)
     setInputTask('')
   }
 
@@ -88,6 +92,19 @@ export default function Home() {
                 : 'bg-white border-gray-300 focus:border-indigo-500'
             }`}
           />
+          <select
+            value={inputPriority}
+            onChange={(e) => setInputPriority(Number(e.target.value) as 1 | 2 | 3)}
+            className={`w-20 px-2 border-2 transition-colors ${
+              theme === 'dark' 
+                ? 'bg-gray-700 text-white border-gray-600' 
+                : 'bg-white border-gray-300'
+            }`}
+          >
+            <option value={1}>1</option>
+            <option value={2}>2</option>
+            <option value={3}>3</option>
+          </select>
           <motion.button 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
@@ -134,6 +151,13 @@ export default function Home() {
                       : theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
                   }`}
                 >
+                  <span className={`inline-block w-8 text-sm ${
+                    task.priority === 3 ? 'text-red-500' :
+                    task.priority === 2 ? 'text-yellow-500' :
+                    'text-green-500'
+                  }`}>
+                    P{task.priority}
+                  </span>
                   {task.text}
                 </span>
               </motion.div>
