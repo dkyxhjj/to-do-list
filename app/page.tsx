@@ -1,193 +1,170 @@
 "use client"
 
-import { useState } from 'react'
-import { motion, AnimatePresence } from 'framer-motion'
-
-interface Task {
-  id: number;     
-  text: string;   
-  completed: boolean;
-  priority: 1 | 2 | 3;
-}
+import { useEffect, useState } from 'react'
+import { supabase } from '../utils/supabase'
+import { Todo, fetchTodos, addTodo, updateTodo, deleteTodo } from '../utils/todos'
 
 export default function Home() {
-  const [tasks, setTasks] = useState<Task[]>([])
-  const [inputTask, setInputTask] = useState('')
-  const [inputPriority, setInputPriority] = useState<1 | 2 | 3>(1)
-  const [theme, setTheme] = useState<'light' | 'dark'>('light')
-
-  const addTask = () => {
-    if (inputTask.trim() === '') return
-
-    const newTask: Task = {
-      id: Date.now(),
-      text: inputTask,
-      completed: false,
-      priority: inputPriority
+  const [todos, setTodos] = useState<Todo[]>([])
+  const [newTask, setNewTask] = useState('')
+  const [newDueDate, setNewDueDate] = useState('')
+  const [isLoading, setIsLoading] = useState(false)
+  
+  // Function to load todos - extracted so we can reuse it
+  const loadTodos = async () => {
+    try {
+      const todos = await fetchTodos()
+      setTodos(todos)
+    } catch (error) {
+      console.error('Error loading todos:', error)
     }
-
-    const updatedTasks = [...tasks, newTask].sort((a, b) => b.priority - a.priority)
-    setTasks(updatedTasks)
-    setInputTask('')
   }
-
-  const toggleTaskCompletion = (id: number) => {
-    setTasks(tasks.map(task => 
-      task.id === id ? { ...task, completed: !task.completed } : task
-    ))
+  
+  useEffect(() => {
+    loadTodos()
+  }, [])
+  
+  const handleAddTodo = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!newTask.trim()) return
+    
+    setIsLoading(true)
+    try {
+      // Fix timezone issue by parsing the date parts manually
+      let dueDate: Date | undefined = undefined
+      if (newDueDate) {
+        // Split the date string into parts
+        const [year, month, day] = newDueDate.split('-').map(Number)
+        // Create date using UTC to avoid timezone issues (month is 0-indexed in JS Date)
+        dueDate = new Date(Date.UTC(year, month - 1, day))
+      }
+      
+      await addTodo(newTask, dueDate)
+      setNewTask('')
+      setNewDueDate('')
+      
+      // Refetch todos to update the list with the new todo
+      await loadTodos()
+    } catch (error) {
+      console.error('Error adding todo:', error)
+    } finally {
+      setIsLoading(false)
+    }
   }
-
-  const clearCompletedTasks = () => {
-    setTasks(tasks.filter(task => !task.completed))
+  
+  const handleDeleteTodo = async (id: number) => {
+    try {
+      await deleteTodo(id)
+      
+      // Also refetch todos after deletion
+      await loadTodos()
+    } catch (error) {
+      console.error('Error deleting todo:', error)
+    }
   }
-
-  const toggleTheme = () => {
-    setTheme(theme === 'light' ? 'dark' : 'light')
+  
+  // Format a date for display
+  const formatDate = (date: Date | null): string => {
+    if (!date) return 'No due date'
+    
+    // Adjust for timezone offset to display the correct date
+    // Get the date components directly from the UTC date
+    const year = date.getUTCFullYear()
+    const month = date.getUTCMonth() // 0-indexed
+    const day = date.getUTCDate()
+    
+    // Create a new date object with these components in local time
+    const localDate = new Date(year, month, day)
+    
+    // Format the date
+    return localDate.toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
   }
-
+  
   return (
-    <div className={`min-h-screen flex items-center justify-center p-4 transition-colors duration-300 ${
-      theme === 'dark' 
-        ? 'bg-gray-900 text-gray-100' 
-        : 'bg-gradient-to-br from-cyan-100 to-blue-200 text-gray-800'
-    }`}>
-      <motion.div 
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.5 }}
-        className={`w-full max-w-md p-6 rounded-2xl shadow-2xl transition-all duration-300 ${
-          theme === 'dark' 
-            ? 'bg-gray-800 border-2 border-gray-700' 
-            : 'bg-white/80 backdrop-blur-lg'
-        }`}
-      >
-        <div className="flex justify-between items-center mb-6">
-          <h1 className={`text-4xl font-bold ${
-            theme === 'dark' ? 'text-purple-300' : 'text-indigo-600'
-          }`}>
-            Task List
-          </h1>
-          <button 
-            onClick={toggleTheme}
-            className={`p-2 rounded-full transition-colors ${
-              theme === 'dark' 
-                ? 'bg-purple-600 text-white hover:bg-purple-500' 
-                : 'bg-gray-200 text-gray-800 hover:bg-gray-300'
-            }`}
-          >
-            {theme === 'dark' ? '☀️' : '🌙'}
-          </button>
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-3xl font-bold mb-6">Todo List App</h1>
+    
+      {/* Add Todo Form */}
+      { (
+        <div className="mb-8">
+          <h2 className="text-xl font-semibold mb-4">Add New Todo</h2>
+          <form onSubmit={handleAddTodo} className="space-y-4">
+            <div>
+              <label htmlFor="task" className="block text-sm font-medium text-gray-700">
+                Task
+              </label>
+              <input
+                type="text"
+                id="task"
+                value={newTask}
+                onChange={(e) => setNewTask(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+                placeholder="Enter task"
+                required
+              />
+            </div>
+            <div>
+              <label htmlFor="dueDate" className="block text-sm font-medium text-gray-700">
+                Due Date
+              </label>
+              <input
+                type="date"
+                id="dueDate"
+                value={newDueDate}
+                onChange={(e) => setNewDueDate(e.target.value)}
+                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
+            >
+              {isLoading ? 'Adding...' : 'Add Todo'}
+            </button>
+          </form>
         </div>
-        
-        <div className="flex mb-4">
-          <input 
-            type="text"
-            value={inputTask}
-            onChange={(e) => setInputTask(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && addTask()} 
-            placeholder="What is due soon!???"
-            className={`flex-grow p-3 rounded-l-lg border-2 transition-colors ${
-              theme === 'dark' 
-                ? 'bg-gray-700 text-white border-gray-600 focus:border-purple-500' 
-                : 'bg-white border-gray-300 focus:border-indigo-500'
-            }`}
-          />
-          <select
-            value={inputPriority}
-            onChange={(e) => setInputPriority(Number(e.target.value) as 1 | 2 | 3)}
-            className={`w-20 px-2 border-2 transition-colors ${
-              theme === 'dark' 
-                ? 'bg-gray-700 text-white border-gray-600' 
-                : 'bg-white border-gray-300'
-            }`}
-          >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
-          </select>
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={addTask}
-            className={`px-4 py-3 rounded-r-lg transition-colors ${
-              theme === 'dark' 
-                ? 'bg-purple-700 text-white hover:bg-purple-600' 
-                : 'bg-indigo-500 text-white hover:bg-indigo-600'
-            }`}
-          >
-            Add
-          </motion.button>
+      )}
+      
+      {/* Todo List */}
+      {(
+        <div>
+          <h2 className="text-xl font-semibold mb-4">Your Todos</h2>
+          {todos.length === 0 ? (
+            <p className="text-gray-500">No todos yet. Add your first one above!</p>
+          ) : (
+            <ul className="space-y-4">
+              {todos.map((todo) => (
+                <li key={todo.id} className="border rounded-lg p-4 bg-white shadow-sm">
+                  <div className="flex justify-between">
+                    <div>
+                      <h3 className="font-medium text-lg">{todo.task}</h3>
+                      {todo.due_date && (
+                        <p className={`mt-1 text-orange-600`}>
+                          Due: {formatDate(todo.due_date)}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-2">
+                        Created: {new Date(todo.created_at).toLocaleString()}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => handleDeleteTodo(todo.id)}
+                      className="text-red-500 hover:text-red-700"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
-
-        <AnimatePresence>
-          <div className="space-y-2 max-h-[300px] overflow-y-auto">
-            {tasks.map((task) => (
-              <motion.div 
-                key={task.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 20 }}
-                transition={{ duration: 0.2 }}
-                className={`flex items-center p-3 rounded-lg transition-all ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 hover:bg-gray-600' 
-                    : 'bg-white shadow-sm hover:shadow-md'
-                }`}
-              >
-                <input 
-                  type="checkbox"
-                  checked={task.completed}
-                  onChange={() => toggleTaskCompletion(task.id)}
-                  className={`mr-3 h-5 w-5 rounded transition-colors ${
-                    theme === 'dark' 
-                      ? 'text-purple-500 bg-gray-600' 
-                      : 'text-indigo-600 bg-gray-200'
-                  }`}
-                />
-                <span 
-                  className={`flex-grow ${
-                    task.completed 
-                      ? 'line-through text-gray-500' 
-                      : theme === 'dark' ? 'text-gray-200' : 'text-gray-800'
-                  }`}
-                >
-                  <span className={`inline-block w-8 text-sm ${
-                    task.priority === 3 ? 'text-red-500' :
-                    task.priority === 2 ? 'text-yellow-500' :
-                    'text-green-500'
-                  }`}>
-                    P{task.priority}
-                  </span>
-                  {task.text}
-                </span>
-              </motion.div>
-            ))}
-          </div>
-        </AnimatePresence>
-
-        {tasks.some(task => task.completed) && (
-          <motion.button 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={clearCompletedTasks}
-            className={`mt-4 w-full p-3 rounded-lg transition-colors ${
-              theme === 'dark' 
-                ? 'bg-red-700 text-white hover:bg-red-600' 
-                : 'bg-red-500 text-white hover:bg-red-600'
-            }`}
-          >
-            Clear Completed Tasks
-          </motion.button>
-        )}
-        
-        <div className={`mt-4 text-center ${
-          theme === 'dark' ? 'text-gray-400' : 'text-gray-600'
-        }`}>
-          {tasks.length > 0 
-            ? `${tasks.filter(task => !task.completed).length} tasks remaining` 
-            : 'No tasks yet'}
-        </div>
-      </motion.div>
+      )}
     </div>
   )
 }
