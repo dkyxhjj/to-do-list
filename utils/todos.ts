@@ -12,7 +12,7 @@ export async function fetchTodos() {
   const { data, error } = await supabase
     .from('todos')
     .select('*')
-    .order('created_at', { ascending: false });
+    .order('due_date', { ascending: true });
   
   if (error) {
     console.error('Error fetching todos:', error);

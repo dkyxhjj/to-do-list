@@ -1,8 +1,7 @@
 "use client"
 
 import { useEffect, useState } from 'react'
-import { supabase } from '../utils/supabase'
-import { Todo, fetchTodos, addTodo, updateTodo, deleteTodo } from '../utils/todos'
+import { Todo, fetchTodos, addTodo, deleteTodo } from '../utils/todos'
 
 export default function Home() {
   const [todos, setTodos] = useState<Todo[]>([])
@@ -10,7 +9,6 @@ export default function Home() {
   const [newDueDate, setNewDueDate] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   
-  // Function to load todos - extracted so we can reuse it
   const loadTodos = async () => {
     try {
       const todos = await fetchTodos()
@@ -19,7 +17,6 @@ export default function Home() {
       console.error('Error loading todos:', error)
     }
   }
-  
   useEffect(() => {
     loadTodos()
   }, [])
@@ -55,28 +52,21 @@ export default function Home() {
   const handleDeleteTodo = async (id: number) => {
     try {
       await deleteTodo(id)
-      
-      // Also refetch todos after deletion
       await loadTodos()
     } catch (error) {
       console.error('Error deleting todo:', error)
     }
   }
   
-  // Format a date for display
   const formatDate = (date: Date | null): string => {
     if (!date) return 'No due date'
     
-    // Adjust for timezone offset to display the correct date
-    // Get the date components directly from the UTC date
     const year = date.getUTCFullYear()
     const month = date.getUTCMonth() // 0-indexed
     const day = date.getUTCDate()
     
-    // Create a new date object with these components in local time
     const localDate = new Date(year, month, day)
     
-    // Format the date
     return localDate.toLocaleDateString(undefined, {
       year: 'numeric',
       month: 'short',
